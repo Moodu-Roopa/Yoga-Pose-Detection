@@ -1,0 +1,26 @@
+# === Python & Environment ===
+*.pyc
+*.pyo
+__pycache__/
+*.pyd
+# .Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+models/
+models1/
+
+
+# === Dataset / Keypoints Cache ===
+DATASET/
+keypoints/
+*.npy
+*.npz
+*.csv
+*.hdf5
+*.json
+*.mp4
+*.avi
+

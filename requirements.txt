@@ -1,0 +1,13 @@
+torch>=1.12.0
+torchvision>=0.13.0
+torchaudio>=0.12.0
+torch-geometric>=2.0.4
+opencv-python>=4.8.0
+mediapipe>=0.10.3
+numpy>=1.23.0
+matplotlib>=3.5.0
+scikit-learn>=1.1.0
+pandas>=1.4.0
+tqdm>=4.64.0
+ipykernel
+streamlit
