@@ -1,5 +1,4 @@
 # app.py
-
 import streamlit as st
 import cv2
 import numpy as np
@@ -9,8 +8,16 @@ import os
 import time
 import atexit
 
+from realtime_code import (
+    extract_keypoints_from_frame, 
+    predict_pose, 
+    get_pose_corrections,
+    mp_drawing,  # ✅ Import drawing utils
+    mp_pose      # ✅ Import pose model
+)
 
-from realtime_code import extract_keypoints_from_frame, predict_pose, get_pose_corrections
+import sys
+print("🔧 Python version:", sys.version)
 
 # Streamlit config
 st.set_page_config(page_title="Yoga Pose Detection", layout="centered")
@@ -39,12 +46,21 @@ if mode == "Webcam":
             keypoints, results, full_body_visible = extract_keypoints_from_frame(frame)
 
             if keypoints is not None:
+                # ✅ Draw landmarks on frame
+                if results.pose_landmarks:
+                    mp_drawing.draw_landmarks(
+                        frame,
+                        results.pose_landmarks,
+                        mp_pose.POSE_CONNECTIONS,
+                        mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
+                        mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
+                    )
+
                 pose_name, confidence = predict_pose(keypoints)
                 corrections = get_pose_corrections(results.pose_landmarks, pose_name)
 
                 text = f"Pose: {pose_name} ({confidence*100:.1f}%)"
-                # cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (50, 255, 50), 2)
-                cv2.putText(frame, f"{pose_name} ({confidence*100:.1f}%)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)  # Bright green
+                cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
                 y_offset = 60
                 if corrections:
@@ -73,6 +89,16 @@ elif mode == "Upload Image":
         keypoints, results, full_body_visible = extract_keypoints_from_frame(frame)
 
         if keypoints is not None:
+            # ✅ Draw landmarks on frame
+            if results.pose_landmarks:
+                mp_drawing.draw_landmarks(
+                    frame,
+                    results.pose_landmarks,
+                    mp_pose.POSE_CONNECTIONS,
+                    mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
+                    mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
+                )
+
             pose_name, confidence = predict_pose(keypoints)
             corrections = get_pose_corrections(results.pose_landmarks, pose_name)
 
@@ -90,7 +116,7 @@ elif mode == "Upload Image":
         else:
             st.error("❌ Unable to extract keypoints from the image.")
 
-        st.image(img, caption="Uploaded Image", use_container_width=True)
+        st.image(frame[..., ::-1], caption="Uploaded Image with Landmarks", use_container_width=True)
 
 # 🔵 Upload Video Mode
 elif mode == "Upload Video":
@@ -131,6 +157,16 @@ elif mode == "Upload Video":
             keypoints, results, full_body_visible = extract_keypoints_from_frame(frame)
 
             if keypoints is not None:
+                # ✅ Draw landmarks on frame
+                if results.pose_landmarks:
+                    mp_drawing.draw_landmarks(
+                        frame,
+                        results.pose_landmarks,
+                        mp_pose.POSE_CONNECTIONS,
+                        mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
+                        mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
+                    )
+
                 pose_name, confidence = predict_pose(keypoints)
                 corrections = get_pose_corrections(results.pose_landmarks, pose_name)
 
@@ -155,22 +191,15 @@ elif mode == "Upload Video":
             frame_idx += 1
             progress.progress(min(frame_idx / total_frames, 1.0), text=f"Processing... {frame_idx}/{total_frames}")
 
-        # cap.release()
-        # out.release()
-        # os.unlink(video_path)
-
-        # st.success("✅ Video processing complete!")
-        # with open(output_path, "rb") as f:
-        #     st.download_button("📥 Download Annotated Video", f, file_name="yoga_pose_output.mp4")
         cap.release()
         out.release()
-        cv2.destroyAllWindows()  # Safe cleanup
-        time.sleep(1)  # Optional: small delay to ensure file handles are closed
+        cv2.destroyAllWindows()
+        time.sleep(1)
         try:
             os.unlink(video_path)
         except PermissionError:
             pass
-            # st.warning("⚠️ Unable to delete temporary file (it may still be in use). You can manually delete it later.")
+
         st.success("✅ Video processing complete!")
         with open(output_path, "rb") as f:
             st.download_button("📥 Download Annotated Video", f, file_name="yoga_pose_output.mp4")
