@@ -7,6 +7,8 @@ import tempfile
 import os
 import time
 import atexit
+import av
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 
 from realtime_code import (
     extract_keypoints_from_frame, 
@@ -17,7 +19,7 @@ from realtime_code import (
 )
 
 import sys
-print("🔧 Python version:", sys.version)
+
 
 # Streamlit config
 st.set_page_config(page_title="Yoga Pose Detection", layout="centered")
@@ -27,56 +29,105 @@ st.markdown("Supports **Webcam**, **Image**, and **Video** input for yoga pose p
 # Select mode
 mode = st.radio("Choose input mode:", ["Webcam", "Upload Image", "Upload Video"])
 
-# 🟢 Webcam Mode
+# ✅ WebRTC Video Transformer
+class YogaPoseTransformer(VideoTransformerBase):
+    def transform(self, frame):
+        image = frame.to_ndarray(format="bgr24")
+        frame = cv2.flip(image, 1)
+
+        keypoints, results, full_body_visible = extract_keypoints_from_frame(frame)
+
+        if keypoints is not None:
+            if results.pose_landmarks:
+                mp_drawing.draw_landmarks(
+                    frame,
+                    results.pose_landmarks,
+                    mp_pose.POSE_CONNECTIONS,
+                    mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
+                    mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
+                )
+
+            pose_name, confidence = predict_pose(keypoints)
+            corrections = get_pose_corrections(results.pose_landmarks, pose_name)
+
+            text = f"Pose: {pose_name} ({confidence*100:.1f}%)"
+            cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+            y_offset = 60
+            if corrections:
+                for correction in corrections[:3]:
+                    y_offset += 25
+                    cv2.putText(frame, f"- {correction}", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 200), 1)
+            else:
+                cv2.putText(frame, "Perfect Pose!", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+            if not full_body_visible:
+                cv2.putText(frame, "⚠️ Partial body detected", (10, frame.shape[0]-30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
+
+        return frame
+
+
+# 🟢 Webcam via WebRTC
 if mode == "Webcam":
-    st.warning("Click 'Start' to use your webcam for live pose prediction.")
-    run = st.button("Start Webcam")
+    st.warning("Click 'Start' and allow webcam access in your browser.")
+    webrtc_streamer(
+        key="yoga-pose",
+        video_processor_factory=YogaPoseTransformer,
+        media_stream_constraints={"video": True, "audio": False},
+        async_processing=True,
+    )
 
-    if run:
-        stframe = st.empty()
-        cap = cv2.VideoCapture(0)
+# # 🟢 Webcam Mode  - works for only local machine
+# if mode == "Webcam":
+#     st.warning("Click 'Start' to use your webcam for live pose prediction.")
+#     run = st.button("Start Webcam")
 
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                st.error("Unable to read from webcam.")
-                break
+#     if run:
+#         stframe = st.empty()
+#         cap = cv2.VideoCapture(0)
 
-            frame = cv2.flip(frame, 1)
-            keypoints, results, full_body_visible = extract_keypoints_from_frame(frame)
+#         while cap.isOpened():
+#             ret, frame = cap.read()
+#             if not ret:
+#                 st.error("Unable to read from webcam.")
+#                 break
 
-            if keypoints is not None:
-                # ✅ Draw landmarks on frame
-                if results.pose_landmarks:
-                    mp_drawing.draw_landmarks(
-                        frame,
-                        results.pose_landmarks,
-                        mp_pose.POSE_CONNECTIONS,
-                        mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                        mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
-                    )
+#             frame = cv2.flip(frame, 1)
+#             keypoints, results, full_body_visible = extract_keypoints_from_frame(frame)
 
-                pose_name, confidence = predict_pose(keypoints)
-                corrections = get_pose_corrections(results.pose_landmarks, pose_name)
+#             if keypoints is not None:
+#                 # ✅ Draw landmarks on frame
+#                 if results.pose_landmarks:
+#                     mp_drawing.draw_landmarks(
+#                         frame,
+#                         results.pose_landmarks,
+#                         mp_pose.POSE_CONNECTIONS,
+#                         mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
+#                         mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
+#                     )
 
-                text = f"Pose: {pose_name} ({confidence*100:.1f}%)"
-                cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+#                 pose_name, confidence = predict_pose(keypoints)
+#                 corrections = get_pose_corrections(results.pose_landmarks, pose_name)
 
-                y_offset = 60
-                if corrections:
-                    for correction in corrections[:3]:
-                        y_offset += 25
-                        cv2.putText(frame, f"- {correction}", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 200), 1)
-                else:
-                    cv2.putText(frame, "Perfect Pose!", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+#                 text = f"Pose: {pose_name} ({confidence*100:.1f}%)"
+#                 cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-                if not full_body_visible:
-                    cv2.putText(frame, "⚠️ Partial body detected", (10, frame.shape[0]-30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
+#                 y_offset = 60
+#                 if corrections:
+#                     for correction in corrections[:3]:
+#                         y_offset += 25
+#                         cv2.putText(frame, f"- {correction}", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 200), 1)
+#                 else:
+#                     cv2.putText(frame, "Perfect Pose!", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-            stframe.image(frame, channels="BGR", use_container_width=True)
+#                 if not full_body_visible:
+#                     cv2.putText(frame, "⚠️ Partial body detected", (10, frame.shape[0]-30),
+#                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
 
-        cap.release()
+#             stframe.image(frame, channels="BGR", use_container_width=True)
+
+#         cap.release()
 
 # 🟡 Upload Image Mode
 elif mode == "Upload Image":
