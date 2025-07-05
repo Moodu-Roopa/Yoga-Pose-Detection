@@ -27,7 +27,7 @@ with open("style.css", encoding="utf-8") as f:
 
 # Sidebar branding
 st.sidebar.image("logo7.png", width=120)
-st.sidebar.markdown("### Yoga Pose GCN App\nReal-time detection powered by GCN + LSTM 💫")
+st.sidebar.markdown("### Yoga Pose GCN App\nReal-time detection powered by GCN + Residual layers + LSTM + MLP💫")
 
 # Header
 st.markdown('<div class="big-title">🧘‍♀️ Real-Time Yoga Pose Detection</div>', unsafe_allow_html=True)
