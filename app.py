@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import cv2
 import numpy as np
@@ -14,22 +13,30 @@ from realtime_code import (
     extract_keypoints_from_frame, 
     predict_pose, 
     get_pose_corrections,
-    mp_drawing,  # ✅ Import drawing utils
-    mp_pose      # ✅ Import pose model
+    mp_drawing,
+    mp_pose
 )
-
-import sys
-
 
 # Streamlit config
 st.set_page_config(page_title="Yoga Pose Detection", layout="centered")
-st.title("🧘‍♀️ Real-Time Yoga Pose Detection with GCN + LSTM")
-st.markdown("Supports **Webcam**, **Image**, and **Video** input for yoga pose prediction and correction.")
 
-# Select mode
+# Load custom CSS
+#with open("style.css") as f:
+with open("style.css", encoding="utf-8") as f:    
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# Sidebar branding
+st.sidebar.image("logo7.png", width=120)
+st.sidebar.markdown("### Yoga Pose GCN App\nReal-time detection powered by GCN + LSTM 💫")
+
+# Header
+st.markdown('<div class="big-title">🧘‍♀️ Real-Time Yoga Pose Detection</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Supports Webcam • Image • Video for Yoga Pose Correction</div>', unsafe_allow_html=True)
+
+# Mode selection
 mode = st.radio("Choose input mode:", ["Webcam", "Upload Image", "Upload Video"])
 
-# ✅ WebRTC Video Transformer
+# ✅ WebRTC Video Transformer for browser webcam
 class YogaPoseTransformer(VideoTransformerBase):
     def transform(self, frame):
         image = frame.to_ndarray(format="bgr24")
@@ -67,7 +74,6 @@ class YogaPoseTransformer(VideoTransformerBase):
 
         return frame
 
-
 # 🟢 Webcam via WebRTC
 if mode == "Webcam":
     st.warning("Click 'Start' and allow webcam access in your browser.")
@@ -78,58 +84,7 @@ if mode == "Webcam":
         async_processing=True,
     )
 
-# # 🟢 Webcam Mode  - works for only local machine
-# if mode == "Webcam":
-#     st.warning("Click 'Start' to use your webcam for live pose prediction.")
-#     run = st.button("Start Webcam")
-
-#     if run:
-#         stframe = st.empty()
-#         cap = cv2.VideoCapture(0)
-
-#         while cap.isOpened():
-#             ret, frame = cap.read()
-#             if not ret:
-#                 st.error("Unable to read from webcam.")
-#                 break
-
-#             frame = cv2.flip(frame, 1)
-#             keypoints, results, full_body_visible = extract_keypoints_from_frame(frame)
-
-#             if keypoints is not None:
-#                 # ✅ Draw landmarks on frame
-#                 if results.pose_landmarks:
-#                     mp_drawing.draw_landmarks(
-#                         frame,
-#                         results.pose_landmarks,
-#                         mp_pose.POSE_CONNECTIONS,
-#                         mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-#                         mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
-#                     )
-
-#                 pose_name, confidence = predict_pose(keypoints)
-#                 corrections = get_pose_corrections(results.pose_landmarks, pose_name)
-
-#                 text = f"Pose: {pose_name} ({confidence*100:.1f}%)"
-#                 cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-
-#                 y_offset = 60
-#                 if corrections:
-#                     for correction in corrections[:3]:
-#                         y_offset += 25
-#                         cv2.putText(frame, f"- {correction}", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 200), 1)
-#                 else:
-#                     cv2.putText(frame, "Perfect Pose!", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-
-#                 if not full_body_visible:
-#                     cv2.putText(frame, "⚠️ Partial body detected", (10, frame.shape[0]-30),
-#                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
-
-#             stframe.image(frame, channels="BGR", use_container_width=True)
-
-#         cap.release()
-
-# 🟡 Upload Image Mode
+# 🟡 Upload Image
 elif mode == "Upload Image":
     uploaded_file = st.file_uploader("Upload a yoga pose image", type=["jpg", "jpeg", "png"])
     if uploaded_file:
@@ -140,7 +95,6 @@ elif mode == "Upload Image":
         keypoints, results, full_body_visible = extract_keypoints_from_frame(frame)
 
         if keypoints is not None:
-            # ✅ Draw landmarks on frame
             if results.pose_landmarks:
                 mp_drawing.draw_landmarks(
                     frame,
@@ -153,7 +107,7 @@ elif mode == "Upload Image":
             pose_name, confidence = predict_pose(keypoints)
             corrections = get_pose_corrections(results.pose_landmarks, pose_name)
 
-            st.success(f"Predicted Pose: **{pose_name}** with {confidence:.1%} confidence")
+            st.markdown(f"<div class='result-box'>🧘‍♀️ Pose: <b>{pose_name}</b><br/>Confidence: {confidence:.1%}</div>", unsafe_allow_html=True)
 
             if not full_body_visible:
                 st.warning("⚠️ Partial body detected — prediction may be less accurate.")
@@ -161,7 +115,7 @@ elif mode == "Upload Image":
             if corrections:
                 st.subheader("🔧 Corrections:")
                 for corr in corrections:
-                    st.markdown(f"- {corr}")
+                    st.markdown(f"<span class='correction'>• {corr}</span>", unsafe_allow_html=True)
             else:
                 st.info("✅ Perfect Pose!")
         else:
@@ -169,7 +123,7 @@ elif mode == "Upload Image":
 
         st.image(frame[..., ::-1], caption="Uploaded Image with Landmarks", use_container_width=True)
 
-# 🔵 Upload Video Mode
+# 🔵 Upload Video
 elif mode == "Upload Video":
     uploaded_video = st.file_uploader("Upload a yoga video file", type=["mp4", "mov", "avi"])
     if uploaded_video:
@@ -177,7 +131,6 @@ elif mode == "Upload Video":
         tfile.write(uploaded_video.read())
         video_path = tfile.name
 
-        # Register cleanup at app exit
         @atexit.register
         def cleanup_temp():
             try:
@@ -208,7 +161,6 @@ elif mode == "Upload Video":
             keypoints, results, full_body_visible = extract_keypoints_from_frame(frame)
 
             if keypoints is not None:
-                # ✅ Draw landmarks on frame
                 if results.pose_landmarks:
                     mp_drawing.draw_landmarks(
                         frame,
@@ -245,11 +197,6 @@ elif mode == "Upload Video":
         cap.release()
         out.release()
         cv2.destroyAllWindows()
-        time.sleep(1)
-        try:
-            os.unlink(video_path)
-        except PermissionError:
-            pass
 
         st.success("✅ Video processing complete!")
         with open(output_path, "rb") as f:
